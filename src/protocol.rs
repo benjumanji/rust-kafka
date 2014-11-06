@@ -14,18 +14,21 @@ macro_rules! kafka_datastructures {
                 $(pub $name: $t),+
             }
 
-            impl KafkaEncodable for $Name {
+            impl KafkaSerializable for $Name {
                 fn encode(&self, writer: &mut Writer) -> IoResult<()> {
-                    $(try!(self.$name.encode(writer)))+;
+                    $(try!(self.$name.encode(writer)));+
                     Ok(())
                 }
-            }
 
-            impl KafkaDecodable for $Name {
                 fn decode(reader: &mut Reader) -> IoResult<$Name> {
                     Ok($Name {
-                        $($name: try!(KafkaDecodable::decode(reader)),)+
+                        $($name: try!(KafkaSerializable::decode(reader)),)+
                     })
+                }
+
+                #[inline]
+                fn size(&self) -> i32 {
+                    [$(self.$name.size()),+].iter().fold(0, |acc, element| acc + *element)
                 }
             }
         )+

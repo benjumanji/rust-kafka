@@ -1,79 +1,80 @@
 use std::io::{Writer, Reader, IoResult, IoError, InvalidInput};
 
-pub trait KafkaEncodable {
+pub trait KafkaSerializable {
     fn encode(&self, writer: &mut Writer) -> IoResult<()>;
-}
-
-pub trait KafkaDecodable {
     fn decode(reader: &mut Reader) -> IoResult<Self>;
+    fn size(&self) -> i32;
 }
 
 
-impl KafkaEncodable for i8 {
+impl KafkaSerializable for i8 {
     fn encode(&self, writer: &mut Writer) -> IoResult<()> {
         writer.write_i8(*self)
     }
-}
 
-impl KafkaDecodable for i8 {
     fn decode(reader: &mut Reader) -> IoResult<i8> {
         reader.read_i8()
     }
+
+    #[inline]
+    fn size(&self) -> i32 {
+        1
+    }
 }
 
-impl KafkaEncodable for i16 {
+impl KafkaSerializable for i16 {
     fn encode(&self, writer: &mut Writer) -> IoResult<()> {
         writer.write_be_i16(*self)
     }
-}
 
-impl KafkaDecodable for i16 {
     fn decode(reader: &mut Reader) -> IoResult<i16> {
         reader.read_be_i16()
     }
+
+    #[inline]
+    fn size(&self) -> i32 {
+        2
+    }
 }
 
-impl KafkaEncodable for i32 {
+impl KafkaSerializable for i32 {
     fn encode(&self, writer: &mut Writer) -> IoResult<()> {
         writer.write_be_i32(*self)
     }
-}
 
-impl KafkaDecodable for i32 {
     fn decode(reader: &mut Reader) -> IoResult<i32> {
         reader.read_be_i32()
     }
+
+    #[inline]
+    fn size(&self) -> i32 {
+        4
+    }
 }
 
-impl KafkaEncodable for i64 {
+impl KafkaSerializable for i64 {
     fn encode(&self, writer: &mut Writer) -> IoResult<()> {
         writer.write_be_i64(*self)
     }
-}
 
-impl KafkaDecodable for i64 {
     fn decode(reader: &mut Reader) -> IoResult<i64> {
         reader.read_be_i64()
     }
-}
 
-impl <'a>KafkaEncodable for &'a str {
-    fn encode(&self, writer: &mut Writer) -> IoResult<()> {
-        try!((self.len() as i16).encode(writer));
-        writer.write_str(*self)
+    #[inline]
+    fn size(&self) -> i32 {
+        8
     }
 }
 
-impl KafkaEncodable for String {
+impl KafkaSerializable for String {
     fn encode(&self, writer: &mut Writer) -> IoResult<()> {
         try!((self.len() as i16).encode(writer));
         writer.write_str(self.as_slice())
     }
-}
 
-impl KafkaDecodable for String {
     fn decode(reader: &mut Reader) -> IoResult<String> {
-        let size: i16 = try!(KafkaDecodable::decode(reader));
+        let size: i16 = try!(KafkaSerializable::decode(reader));
         let buffer = try!(reader.read_exact(size as uint));
 
         match String::from_utf8(buffer) {
@@ -81,9 +82,14 @@ impl KafkaDecodable for String {
             Err(_) => Err(IoError{kind: InvalidInput, desc: "Problem decoding buffer as utf8", detail: None})
         }
     }
+
+    #[inline]
+    fn size(&self) -> i32 {
+        (0i16).size() + (self.as_bytes().len() as i32)
+    }
 }
 
-impl KafkaEncodable for Option<String> {
+impl KafkaSerializable for Option<String> {
     fn encode(&self, writer: &mut Writer) -> IoResult<()> {
         match *self {
             Some(ref string) => {
@@ -93,11 +99,9 @@ impl KafkaEncodable for Option<String> {
             None => (-1i16).encode(writer)
         }
     }
-}
 
-impl KafkaDecodable for Option<String> {
     fn decode(reader: &mut Reader) -> IoResult<Option<String>> {
-        let size: i16 = try!(KafkaDecodable::decode(reader));
+        let size: i16 = try!(KafkaSerializable::decode(reader));
 
         if size == -1 {
             Ok(None)
@@ -110,9 +114,19 @@ impl KafkaDecodable for Option<String> {
             }
         }
     }
+
+    #[inline]
+    fn size(&self) -> i32 {
+        (0i16).size() + match *self {
+            Some(ref string) => {
+                string.as_bytes().len() as i32
+            },
+            None => 0
+        }
+    }
 }
 
-impl <T:KafkaEncodable> KafkaEncodable for Vec<T> {
+impl <T:KafkaSerializable> KafkaSerializable for Vec<T> {
     fn encode(&self, writer: &mut Writer) -> IoResult<()> {
         try!((self.len() as i32).encode(writer));
         for element in self.iter() {
@@ -120,34 +134,40 @@ impl <T:KafkaEncodable> KafkaEncodable for Vec<T> {
         }
         Ok(())
     }
-}
 
-impl <T:KafkaDecodable> KafkaDecodable for Vec<T> {
     fn decode(reader: &mut Reader) -> IoResult<Vec<T>> {
-        let size: i32 = try!(KafkaDecodable::decode(reader));
+        let size: i32 = try!(KafkaSerializable::decode(reader));
         let mut result = Vec::with_capacity(size as uint);
         for _ in range(0, size) {
-            result.push(try!(KafkaDecodable::decode(reader)))
+            result.push(try!(KafkaSerializable::decode(reader)))
         }
         Ok(result)
     }
+
+    #[inline]
+    fn size(&self) -> i32 {
+        self.iter().fold((0i32).size(), |sum, ref element| sum + element.size())
+    }
 }
 
-impl KafkaEncodable for Vec<u8> {
+impl KafkaSerializable for Vec<u8> {
     fn encode(&self, writer: &mut Writer) -> IoResult<()> {
         try!((self.len() as i32).encode(writer));
         writer.write(self.as_slice())
     }
-}
 
-impl KafkaDecodable for Vec<u8> {
     fn decode(reader: &mut Reader) -> IoResult<Vec<u8>> {
-        let size: i32 = try!(KafkaDecodable::decode(reader));
+        let size: i32 = try!(KafkaSerializable::decode(reader));
         reader.read_exact(size as uint)
+    }
+
+    #[inline]
+    fn size(&self) -> i32 {
+        (0i32).size() + (self.len() as i32)
     }
 }
 
-impl KafkaEncodable for Option<Vec<u8>> {
+impl KafkaSerializable for Option<Vec<u8>> {
     fn encode(&self, writer: &mut Writer) -> IoResult<()> {
         match *self {
             Some(ref vector) => {
@@ -157,17 +177,25 @@ impl KafkaEncodable for Option<Vec<u8>> {
             None => (-1i32).encode(writer)
         }
     }
-}
 
-impl KafkaDecodable for Option<Vec<u8>> {
     fn decode(reader: &mut Reader) -> IoResult<Option<Vec<u8>>> {
-        let size: i32 = try!(KafkaDecodable::decode(reader));
+        let size: i32 = try!(KafkaSerializable::decode(reader));
 
         if size == -1 {
             Ok(None)
         } else {
             let vec = try!(reader.read_exact(size as uint));
             Ok(Some(vec))
+        }
+    }
+
+    #[inline]
+    fn size(&self) -> i32 {
+        (0i32).size() + match *self {
+            Some(ref vector) => {
+                vector.len() as i32
+            },
+            None => 0
         }
     }
 }
@@ -180,11 +208,11 @@ mod tests {
     use super::*;
     use std::io::{MemWriter, MemReader};
 
-    fn write_read_test<T:KafkaEncodable + KafkaDecodable + Eq + std::fmt::Show>(input: T) {
+    fn write_read_test<T:KafkaSerializable + Eq + std::fmt::Show>(input: T) {
         let mut writer = MemWriter::new();
         input.encode(&mut writer).ok().unwrap();
         let mut reader = MemReader::new(writer.unwrap());
-        let result = KafkaDecodable::decode(&mut reader).ok().unwrap();
+        let result = KafkaSerializable::decode(&mut reader).ok().unwrap();
         assert!(reader.eof());
         assert_eq!(input, result);
     }

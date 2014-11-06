@@ -71,8 +71,7 @@ kafka_datastructures! (
 
     struct MessageSetElement {
         offset: i64,
-        message_size: i32,
-        message: Message
+        message: WithSize<Message>
     }
 
     struct MessageSet {
@@ -86,8 +85,7 @@ kafka_datastructures! (
 
     struct ProduceRequestData {
         partition: i32,
-        message_set_size: i32,
-        message_set: MessageSet
+        message_set: WithSize<MessageSet>
     }
 
     struct ProduceRequestTopic {

@@ -81,6 +81,7 @@ impl KafkaSerializable for String {
         let size: i16 = try!(KafkaSerializable::decode(reader));
         let buffer = try!(reader.read_exact(size as uint));
 
+        assert!(size >= 0);
         match String::from_utf8(buffer) {
             Ok(string) => Ok(string),
             Err(_) => Err(IoError{kind: InvalidInput, desc: "Problem decoding buffer as utf8", detail: None})
@@ -107,6 +108,7 @@ impl KafkaSerializable for Option<String> {
     fn decode(reader: &mut io::Reader) -> IoResult<Option<String>> {
         let size: i16 = try!(KafkaSerializable::decode(reader));
 
+        assert!(size >= -1);
         if size == -1 {
             Ok(None)
         } else {
@@ -141,6 +143,8 @@ impl <T:KafkaSerializable> KafkaSerializable for Vec<T> {
 
     fn decode(reader: &mut io::Reader) -> IoResult<Vec<T>> {
         let size: i32 = try!(KafkaSerializable::decode(reader));
+
+        assert!(size >= 0);
         let mut result = Vec::with_capacity(size as uint);
         for _ in range(0, size) {
             result.push(try!(KafkaSerializable::decode(reader)))
@@ -162,6 +166,8 @@ impl KafkaSerializable for Vec<u8> {
 
     fn decode(reader: &mut io::Reader) -> IoResult<Vec<u8>> {
         let size: i32 = try!(KafkaSerializable::decode(reader));
+
+        assert!(size >= 0);
         reader.read_exact(size as uint)
     }
 
@@ -185,6 +191,7 @@ impl KafkaSerializable for Option<Vec<u8>> {
     fn decode(reader: &mut io::Reader) -> IoResult<Option<Vec<u8>>> {
         let size: i32 = try!(KafkaSerializable::decode(reader));
 
+        assert!(size >= -1);
         if size == -1 {
             Ok(None)
         } else {
@@ -213,7 +220,10 @@ impl <T:KafkaSerializable> KafkaSerializable for WithSize<T>  {
     fn decode(reader: &mut io::Reader) -> IoResult<WithSize<T>> {
         let size: i32 = try!(KafkaSerializable::decode(reader));
         let mut limited_reader = LimitReader::new(reader, size as uint);
-        Ok(WithSize(try!(KafkaSerializable::decode(&mut limited_reader))))
+        let result = try!(KafkaSerializable::decode(&mut limited_reader));
+
+        assert_eq!(limited_reader.limit(), 0);
+        Ok(WithSize(result))
     }
 
     #[inline]

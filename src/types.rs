@@ -9,7 +9,7 @@ pub trait KafkaSerializable {
 }
 
 #[deriving(Show, PartialEq, Eq)]
-pub struct WithSize<T:KafkaSerializable>(T);
+pub struct WithSize<T:KafkaSerializable>(pub T);
 
 impl KafkaSerializable for i8 {
     fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {

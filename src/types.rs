@@ -243,6 +243,7 @@ mod tests {
     fn write_read_test<T:KafkaSerializable + Eq + fmt::Show>(input: T) {
         let mut writer = MemWriter::new();
         input.encode(&mut writer).ok().unwrap();
+        assert_eq!(writer.get_ref().len() as i32, input.size());
         let mut reader = MemReader::new(writer.unwrap());
         let result = KafkaSerializable::decode(&mut reader).ok().unwrap();
         assert!(reader.eof());

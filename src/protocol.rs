@@ -215,7 +215,6 @@ mod tests {
     extern crate core;
     use super::*;
     use types::KafkaSerializable;
-    use types;
     use std::io::MemWriter;
 
 
@@ -232,7 +231,7 @@ mod tests {
             }
         );
 
-        request.encode(&mut writer);
+        request.encode(&mut writer).ok().unwrap();
 
         let expected = [
             0x00, 0x00, 0x00, 26,

@@ -106,18 +106,18 @@ kafka_datastructures! (
         port: i32
     }
 
-    struct TopicMetadata {
-        topic_error_code: i16,
-        topic_name: String,
-        partition_metadatas: Vec<PartitionMetadata>
-    }
-
     struct PartitionMetadata {
-        partition_error_code: i16,
-        partition_id: i32,
+        error_code: i16,
+        partition: i32,
         leader: i32,
         replicas: Vec<i32>,
         isr: Vec<i32>
+    }
+
+    struct TopicMetadata {
+        error_code: i16,
+        name: String,
+        partitions: Vec<PartitionMetadata>
     }
 
     struct Message {
@@ -148,7 +148,7 @@ kafka_datastructures! (
     }
 
     struct ProduceRequestTopic {
-        topic_name: String,
+        name: String,
         partitions: Vec<ProduceRequestPartition>
     }
 
@@ -164,14 +164,14 @@ kafka_datastructures! (
         max_number_of_offsets: i32
     }
 
-    struct OffsetRequestElement {
-        topic_name: String,
+    struct OffsetRequestTopic {
+        name: String,
         partitions: Vec<OffsetRequestPartition>
     }
 
     struct OffsetRequest {
         replica_id: i32,
-        requests: Vec<OffsetRequestElement>
+        requests: Vec<OffsetRequestTopic>
     }
 
     struct PartitionOffset {
@@ -181,7 +181,7 @@ kafka_datastructures! (
     }
 
     struct OffsetResponseTopic {
-        topic_name: String,
+        name: String,
         partitions: Vec<PartitionOffset>
     }
 
@@ -196,7 +196,7 @@ kafka_datastructures! (
     }
 
     struct FetchRequestTopic {
-        topic_name: String,
+        name: String,
         partitions: Vec<FetchRequestPartition>
     }
 
@@ -215,12 +215,66 @@ kafka_datastructures! (
     }
 
     struct FetchResponseTopic {
-        topic_name: String,
+        name: String,
         partitions: Vec<FetchResponsePartition>
     }
 
     struct FetchResponse {
         topics: Vec<FetchResponseTopic>
+    }
+
+    struct ConsumerMetadataRequest {
+        group: String
+    }
+
+    struct ConsumerMetadataResponse {
+        error_code: i16,
+        coordinator_id: i32,
+        coordinator_host: String,
+        coordinator_port: i32
+    }
+
+    struct OffsetCommitRequestPartition {
+        partition: i32,
+        offset: i64,
+        timestamp: i64,
+        metadata: String
+    }
+
+    struct OffsetCommitRequestTopic {
+        name: String,
+        partitions: Vec<OffsetCommitRequestPartition>
+    }
+
+    struct OffsetCommitRequest {
+        consumer_group: String,
+        topics: Vec<OffsetCommitRequestTopic>
+    }
+
+    struct OffsetFetchRequestTopic {
+        name: String,
+        partitions: Vec<i32>
+    }
+
+    struct OffsetFetchRequest {
+        consumer_group: String,
+        topics: OffsetFetchRequestTopic
+    }
+
+    struct OffsetFetchResponsePartition {
+        partition: i32,
+        offset: i64,
+        metadata: String,
+        error_code: i16
+    }
+
+    struct OffsetFetchResponseTopic {
+        name: String,
+        partitions: Vec<OffsetFetchResponsePartition>
+    }
+
+    struct OffsetFetchResponse {
+        topics: Vec<OffsetFetchResponseTopic>
     }
 )
 
@@ -242,6 +296,18 @@ impl Request for OffsetRequest {
 
 impl Request for MetadataRequest {
     fn api_key(_: Option<MetadataRequest>) -> i16 { 3 }
+}
+
+impl Request for OffsetCommitRequest {
+    fn api_key(_: Option<OffsetCommitRequest>) -> i16 { 8 }
+}
+
+impl Request for OffsetFetchRequest {
+    fn api_key(_: Option<OffsetFetchRequest>) -> i16 { 9 }
+}
+
+impl Request for ConsumerMetadataRequest {
+    fn api_key(_: Option<ConsumerMetadataRequest>) -> i16 { 10 }
 }
 
 #[deriving(Show, PartialEq, Eq)]

@@ -96,7 +96,6 @@ macro_rules! kafka_datastructures {
 }
 
 kafka_datastructures! (
-
     struct MetadataRequest {
         topic_names: Vec<String>
     }
@@ -143,25 +142,102 @@ kafka_datastructures! (
         topic_metadatas: Vec<TopicMetadata>
     }
 
-    struct ProduceRequestData {
+    struct ProduceRequestPartition {
         partition: i32,
         message_set: WithSize<MessageSet>
     }
 
     struct ProduceRequestTopic {
         topic_name: String,
-        datas: Vec<ProduceRequestData>
+        partitions: Vec<ProduceRequestPartition>
     }
 
     struct ProduceRequest {
         required_acks: i16,
         timeout: i32,
-        produce_request_topics: Vec<ProduceRequestTopic>
+        topics: Vec<ProduceRequestTopic>
+    }
+
+    struct OffsetRequestPartition {
+        partition: i32,
+        time: i64,
+        max_number_of_offsets: i32
+    }
+
+    struct OffsetRequestElement {
+        topic_name: String,
+        partitions: Vec<OffsetRequestPartition>
+    }
+
+    struct OffsetRequest {
+        replica_id: i32,
+        requests: Vec<OffsetRequestElement>
+    }
+
+    struct PartitionOffset {
+        partition: i32,
+        error_code: i16,
+        offset: i64
+    }
+
+    struct OffsetResponseTopic {
+        topic_name: String,
+        partitions: Vec<PartitionOffset>
+    }
+
+    struct OffsetResponse {
+        responses: Vec<OffsetResponseTopic>
+    }
+
+    struct FetchRequestPartition {
+        partition: i32,
+        fetch_offset: i64,
+        max_bytes: i32
+    }
+
+    struct FetchRequestTopic {
+        topic_name: String,
+        partitions: Vec<FetchRequestPartition>
+    }
+
+    struct FetchRequest {
+        replica_id: i32,
+        max_wait_time: i32,
+        min_bytes: i32,
+        elements: Vec<FetchRequestTopic>
+    }
+
+    struct FetchResponsePartition {
+        partition: i32,
+        error_code: i16,
+        highwater_mark_offset: i64,
+        messages: WithSize<MessageSet>
+    }
+
+    struct FetchResponseTopic {
+        topic_name: String,
+        partitions: Vec<FetchResponsePartition>
+    }
+
+    struct FetchResponse {
+        topics: Vec<FetchResponseTopic>
     }
 )
 
 pub trait Request: KafkaSerializable {
     fn api_key(_: Option<Self>) -> i16;
+}
+
+impl Request for ProduceRequest {
+    fn api_key(_: Option<ProduceRequest>) -> i16 { 0 }
+}
+
+impl Request for FetchRequest {
+    fn api_key(_: Option<FetchRequest>) -> i16 { 1 }
+}
+
+impl Request for OffsetRequest {
+    fn api_key(_: Option<OffsetRequest>) -> i16 { 2 }
 }
 
 impl Request for MetadataRequest {

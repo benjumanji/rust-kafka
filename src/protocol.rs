@@ -158,6 +158,21 @@ kafka_datastructures! (
         topics: Vec<ProduceRequestTopic>
     }
 
+    struct ProduceResponsePartition {
+        partition: i32,
+        error_code: i16,
+        offset: i64
+    }
+
+    struct ProduceResponseTopic {
+        name: String,
+        partitions: Vec<ProduceResponsePartition>
+    }
+
+    struct ProduceResponse {
+        topics: Vec<ProduceResponseTopic>
+    }
+
     struct OffsetRequestPartition {
         partition: i32,
         time: i64,
@@ -249,6 +264,15 @@ kafka_datastructures! (
     struct OffsetCommitRequest {
         consumer_group: String,
         topics: Vec<OffsetCommitRequestTopic>
+    }
+
+    struct OffsetCommitResponseTopic {
+        name: String,
+        partitions: Vec<i32>
+    }
+
+    struct OffsetCommitResponse {
+        topics: Vec<OffsetCommitResponseTopic>
     }
 
     struct OffsetFetchRequestTopic {
@@ -350,7 +374,13 @@ impl <T:Request> KafkaSerializable for RequestMessage<T> {
 
 pub trait Response: KafkaSerializable {}
 
+impl Response for ProduceResponse {}
+impl Response for FetchResponse {}
+impl Response for OffsetResponse {}
 impl Response for MetadataResponse {}
+impl Response for OffsetFetchResponse {}
+impl Response for OffsetCommitResponse {}
+impl Response for ConsumerMetadataResponse {}
 
 #[deriving(Show, PartialEq, Eq)]
 pub struct ResponseMessage<T:Response> {

@@ -106,20 +106,6 @@ kafka_datastructures! (
         port: i32
     }
 
-    struct PartitionMetadata {
-        error_code: i16,
-        partition: i32,
-        leader: i32,
-        replicas: Vec<i32>,
-        isr: Vec<i32>
-    }
-
-    struct TopicMetadata {
-        error_code: i16,
-        name: String,
-        partitions: Vec<PartitionMetadata>
-    }
-
     struct Message {
         crc: i32,
         magic_byte: i8,
@@ -137,9 +123,23 @@ kafka_datastructures! (
         messages: Vec<MessageSetElement>
     }
 
+    struct PartitionMetadata {
+        error_code: i16,
+        partition: i32,
+        leader: i32,
+        replicas: Vec<i32>,
+        isr: Vec<i32>
+    }
+
+    struct TopicMetadata {
+        error_code: i16,
+        name: String,
+        partitions: Vec<PartitionMetadata>
+    }
+
     struct MetadataResponse {
         brokers: Vec<Broker>,
-        topic_metadatas: Vec<TopicMetadata>
+        topics: Vec<TopicMetadata>
     }
 
     struct ProduceRequestPartition {
@@ -385,27 +385,27 @@ impl Response for ConsumerMetadataResponse {}
 #[deriving(Show, PartialEq, Eq)]
 pub struct ResponseMessage<T:Response> {
     pub correlation_id: i32,
-    pub response_message: T
+    pub response: T
 }
 
 impl <T:Response> KafkaSerializable for ResponseMessage<T> {
     fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
         try!(self.correlation_id.encode(writer));
-        self.response_message.encode(writer)
+        self.response.encode(writer)
     }
 
     fn decode(reader: &mut io::Reader) -> IoResult<ResponseMessage<T>> {
         Ok(
             ResponseMessage{
                 correlation_id: try!(KafkaSerializable::decode(reader)),
-                response_message: try!(KafkaSerializable::decode(reader))
+                response: try!(KafkaSerializable::decode(reader))
             }
         )
     }
 
     #[inline]
     fn size(&self) -> i32 {
-        (0i32).size() + self.response_message.size()
+        (0i32).size() + self.response.size()
     }
 }
 

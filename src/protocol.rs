@@ -3,6 +3,63 @@ use std::io;
 use std::io::{IoResult};
 use std::io::util::LimitReader;
 
+#[deriving(Show, PartialEq, Eq)]
+pub enum Error {
+    Unknown = -1,
+    NoError = 0,
+    OffsetOutOfRange = 1,
+    InvalidMessage = 2,
+    UnknownTopicOrPartition = 3,
+    InvalidMessageSize = 4,
+    LeaderNotAvailable = 5,
+    NotLeaderForPartition = 6,
+    RequestTimedOut = 7,
+    BrokerNotAvailable = 8,
+    ReplicaNotAvailable = 9,
+    MessageSizeTooLarge = 10,
+    StaleControllerEpochCode = 11,
+    OffsetMetadataTooLargeCode = 12,
+    OffsetsLoadInProgressCode = 14,
+    ConsumerCoordinatorNotAvailableCode = 15,
+    NotCoordinatorForConsumerCode = 16
+}
+
+impl FromPrimitive for Error {
+    fn from_i64(n: i64) -> Option<Error> {
+        match n {
+            0 => Some(NoError),
+            1 => Some(OffsetOutOfRange),
+            2 => Some(InvalidMessage),
+            3 => Some(UnknownTopicOrPartition),
+            4 => Some(InvalidMessageSize),
+            5 => Some(LeaderNotAvailable),
+            6 => Some(NotLeaderForPartition),
+            7 => Some(RequestTimedOut),
+            8 => Some(BrokerNotAvailable),
+            9 => Some(ReplicaNotAvailable),
+            10 => Some(MessageSizeTooLarge),
+            11 => Some(StaleControllerEpochCode),
+            12 => Some(OffsetMetadataTooLargeCode),
+            14 => Some(OffsetsLoadInProgressCode),
+            15 => Some(ConsumerCoordinatorNotAvailableCode),
+            16 => Some(NotCoordinatorForConsumerCode),
+            -1 => Some(Unknown),
+            _ => None
+        }
+    }
+
+    fn from_u64(_: u64) -> Option<Error> {
+        panic!("Can't convert unsigned integer to Error")
+    }
+}
+
+#[test]
+fn test_fromprimitive() {
+    for &(n, expected) in [(0, Some(NoError)), (-1, Some(Unknown)), (20, None)].iter() {
+        let error: Option<Error> = FromPrimitive::from_i64(n);
+        assert_eq!(error, expected);
+    }
+}
 
 macro_rules! kafka_datastructures {
     (

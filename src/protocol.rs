@@ -1,10 +1,11 @@
 use std::io;
-use std::io::{IoResult, IoError, InvalidInput};
 use std::io::util::LimitReader;
 
+use types::*;
+
 pub trait KafkaSerializable {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()>;
-    fn decode(reader: &mut io::Reader) -> IoResult<Self>;
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()>;
+    fn decode(reader: &mut io::Reader) -> KafkaResult<Self>;
     fn size(&self) -> i32;
 }
 
@@ -12,12 +13,12 @@ pub trait KafkaSerializable {
 pub struct WithSize<T:KafkaSerializable>(pub T);
 
 impl KafkaSerializable for i8 {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
-        writer.write_i8(*self)
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
+        Ok(try!(writer.write_i8(*self)))
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<i8> {
-        reader.read_i8()
+    fn decode(reader: &mut io::Reader) -> KafkaResult<i8> {
+        Ok(try!(reader.read_i8()))
     }
 
     #[inline]
@@ -27,12 +28,12 @@ impl KafkaSerializable for i8 {
 }
 
 impl KafkaSerializable for i16 {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
-        writer.write_be_i16(*self)
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
+        Ok(try!(writer.write_be_i16(*self)))
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<i16> {
-        reader.read_be_i16()
+    fn decode(reader: &mut io::Reader) -> KafkaResult<i16> {
+        Ok(try!(reader.read_be_i16()))
     }
 
     #[inline]
@@ -42,12 +43,12 @@ impl KafkaSerializable for i16 {
 }
 
 impl KafkaSerializable for i32 {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
-        writer.write_be_i32(*self)
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
+        Ok(try!(writer.write_be_i32(*self)))
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<i32> {
-        reader.read_be_i32()
+    fn decode(reader: &mut io::Reader) -> KafkaResult<i32> {
+        Ok(try!(reader.read_be_i32()))
     }
 
     #[inline]
@@ -57,12 +58,12 @@ impl KafkaSerializable for i32 {
 }
 
 impl KafkaSerializable for i64 {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
-        writer.write_be_i64(*self)
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
+        Ok(try!(writer.write_be_i64(*self)))
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<i64> {
-        reader.read_be_i64()
+    fn decode(reader: &mut io::Reader) -> KafkaResult<i64> {
+        Ok(try!(reader.read_be_i64()))
     }
 
     #[inline]
@@ -72,20 +73,20 @@ impl KafkaSerializable for i64 {
 }
 
 impl KafkaSerializable for String {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
         try!((self.len() as i16).encode(writer));
-        writer.write_str(self.as_slice())
+        Ok(try!(writer.write_str(self.as_slice())))
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<String> {
+    fn decode(reader: &mut io::Reader) -> KafkaResult<String> {
         let size: i16 = try!(KafkaSerializable::decode(reader));
         let buffer = try!(reader.read_exact(size as uint));
 
         assert!(size >= 0);
-        match String::from_utf8(buffer) {
+        Ok(try!(match String::from_utf8(buffer) {
             Ok(string) => Ok(string),
-            Err(_) => Err(IoError{kind: InvalidInput, desc: "Problem decoding buffer as utf8", detail: None})
-        }
+            Err(_) => Err((MalformedResponseError, "Malformed UTF8 response"))
+        }))
     }
 
     #[inline]
@@ -95,17 +96,17 @@ impl KafkaSerializable for String {
 }
 
 impl KafkaSerializable for Option<String> {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
         match *self {
             Some(ref string) => {
                 try!((string.len() as i16).encode(writer));
-                writer.write_str(string.as_slice())
+                Ok(try!(writer.write_str(string.as_slice())))
             },
             None => (-1i16).encode(writer)
         }
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<Option<String>> {
+    fn decode(reader: &mut io::Reader) -> KafkaResult<Option<String>> {
         let size: i16 = try!(KafkaSerializable::decode(reader));
 
         assert!(size >= -1);
@@ -114,10 +115,10 @@ impl KafkaSerializable for Option<String> {
         } else {
             let buffer = try!(reader.read_exact(size as uint));
 
-            match String::from_utf8(buffer) {
+            Ok(try!(match String::from_utf8(buffer) {
                 Ok(string) => Ok(Some(string)),
-                Err(_) => Err(IoError{kind: InvalidInput, desc: "Problem decoding buffer as utf8", detail: None})
-            }
+                Err(_) => Err((MalformedResponseError, "Malformed UTF8 response"))
+            }))
         }
     }
 
@@ -133,7 +134,7 @@ impl KafkaSerializable for Option<String> {
 }
 
 impl <T:KafkaSerializable> KafkaSerializable for Vec<T> {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
         try!((self.len() as i32).encode(writer));
         for element in self.iter() {
             try!(element.encode(writer))
@@ -141,7 +142,7 @@ impl <T:KafkaSerializable> KafkaSerializable for Vec<T> {
         Ok(())
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<Vec<T>> {
+    fn decode(reader: &mut io::Reader) -> KafkaResult<Vec<T>> {
         let size: i32 = try!(KafkaSerializable::decode(reader));
 
         assert!(size >= 0);
@@ -159,16 +160,17 @@ impl <T:KafkaSerializable> KafkaSerializable for Vec<T> {
 }
 
 impl KafkaSerializable for Vec<u8> {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
         try!((self.len() as i32).encode(writer));
-        writer.write(self.as_slice())
+        Ok(try!(writer.write(self.as_slice())))
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<Vec<u8>> {
+    fn decode(reader: &mut io::Reader) -> KafkaResult<Vec<u8>> {
         let size: i32 = try!(KafkaSerializable::decode(reader));
-
-        assert!(size >= 0);
-        reader.read_exact(size as uint)
+        if size < 0 {
+            fail!((MalformedResponseError, "Negative array size"));
+        }
+        Ok(try!(reader.read_exact(size as uint)))
     }
 
     #[inline]
@@ -178,20 +180,23 @@ impl KafkaSerializable for Vec<u8> {
 }
 
 impl KafkaSerializable for Option<Vec<u8>> {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
         match *self {
             Some(ref vector) => {
                 try!((vector.len() as i32).encode(writer));
-                writer.write(vector.as_slice())
+                Ok(try!(writer.write(vector.as_slice())))
             },
             None => (-1i32).encode(writer)
         }
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<Option<Vec<u8>>> {
+    fn decode(reader: &mut io::Reader) -> KafkaResult<Option<Vec<u8>>> {
         let size: i32 = try!(KafkaSerializable::decode(reader));
 
-        assert!(size >= -1);
+        if size < -1 {
+            fail!((MalformedResponseError, "Negative array size"));
+        }
+
         if size == -1 {
             Ok(None)
         } else {
@@ -212,17 +217,20 @@ impl KafkaSerializable for Option<Vec<u8>> {
 }
 
 impl <T:KafkaSerializable> KafkaSerializable for WithSize<T>  {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
         try!(self.0.size().encode(writer));
         self.0.encode(writer)
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<WithSize<T>> {
+    fn decode(reader: &mut io::Reader) -> KafkaResult<WithSize<T>> {
         let size: i32 = try!(KafkaSerializable::decode(reader));
         let mut limited_reader = LimitReader::new(reader, size as uint);
         let result = try!(KafkaSerializable::decode(&mut limited_reader));
 
-        assert_eq!(limited_reader.limit(), 0);
+        if limited_reader.limit() > 0 {
+            fail!((MalformedResponseError, "Less data read than specified"));
+        }
+
         Ok(WithSize(result))
     }
 
@@ -306,12 +314,12 @@ macro_rules! kafka_datastructures {
             }
 
             impl KafkaSerializable for $Name {
-                fn encode(&self, writer: &mut Writer) -> IoResult<()> {
+                fn encode(&self, writer: &mut Writer) -> KafkaResult<()> {
                     $(try!(self.$name.encode(writer)));+
                     Ok(())
                 }
 
-                fn decode(reader: &mut Reader) -> IoResult<$Name> {
+                fn decode(reader: &mut Reader) -> KafkaResult<$Name> {
                     Ok($Name {
                         $($name: try!(KafkaSerializable::decode(reader)),)+
                     })
@@ -575,7 +583,7 @@ pub struct RequestMessage<T:Request> {
 }
 
 impl <T:Request> KafkaSerializable for RequestMessage<T> {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
         try!(Request::api_key(None::<T>).encode(writer));
         try!((0i16).encode(writer)); // Currently the only API version is 0
         try!(self.correlation_id.encode(writer));
@@ -583,11 +591,17 @@ impl <T:Request> KafkaSerializable for RequestMessage<T> {
         self.request_message.encode(writer)
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<RequestMessage<T>> {
+    fn decode(reader: &mut io::Reader) -> KafkaResult<RequestMessage<T>> {
         let api_key: i16 = try!(KafkaSerializable::decode(reader));
-        assert_eq!(api_key, Request::api_key(None::<T>));
+        if api_key != Request::api_key(None::<T>) {
+            fail!((MalformedResponseError, "Unexpected ApiKey"));
+        }
+
         let api_version: i16 = try!(KafkaSerializable::decode(reader));
-        assert_eq!(api_version, 0);
+        if api_version != 0 {
+            fail!((MalformedResponseError, "Unexpected API version"));
+        }
+
         Ok(
             RequestMessage{
                 correlation_id: try!(KafkaSerializable::decode(reader)),
@@ -620,12 +634,12 @@ pub struct ResponseMessage<T:Response> {
 }
 
 impl <T:Response> KafkaSerializable for ResponseMessage<T> {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
         try!(self.correlation_id.encode(writer));
         self.response.encode(writer)
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<ResponseMessage<T>> {
+    fn decode(reader: &mut io::Reader) -> KafkaResult<ResponseMessage<T>> {
         Ok(
             ResponseMessage{
                 correlation_id: try!(KafkaSerializable::decode(reader)),
@@ -648,17 +662,19 @@ impl <T:Request> IsRequestOrResponse for RequestMessage<T> {}
 pub struct RequestOrResponse<T:IsRequestOrResponse>(pub T);
 
 impl <T:IsRequestOrResponse> KafkaSerializable for RequestOrResponse<T>  {
-    fn encode(&self, writer: &mut io::Writer) -> IoResult<()> {
+    fn encode(&self, writer: &mut io::Writer) -> KafkaResult<()> {
         try!(self.0.size().encode(writer));
         self.0.encode(writer)
     }
 
-    fn decode(reader: &mut io::Reader) -> IoResult<RequestOrResponse<T>> {
+    fn decode(reader: &mut io::Reader) -> KafkaResult<RequestOrResponse<T>> {
         let size: i32 = try!(KafkaSerializable::decode(reader));
         let mut limited_reader = LimitReader::new(reader, size as uint);
         let result = try!(KafkaSerializable::decode(&mut limited_reader));
 
-        assert_eq!(limited_reader.limit(), 0);
+        if limited_reader.limit() != 0 {
+            fail!((MalformedResponseError, "Less data read than specified"));
+        }
 
         Ok(RequestOrResponse(result))
     }

@@ -3,5 +3,4 @@
 #![feature(tuple_indexing)]
 #![experimental]
 
-pub mod types;
 pub mod protocol;
